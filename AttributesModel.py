@@ -122,13 +122,16 @@ train_dataset = ClothingDataset(image_paths, image_labels, transform=transform)
 train_loader = DataLoader(train_dataset, batch_size=size_of_batch, shuffle=False, num_workers=num_of_workers)
 
 
-model = models.resnet50(pretrained=True)
-model.fc = nn.Linear(model.fc.in_features, 1000)  # 1000 output attributes
-
+model.fc = torch.nn.Sequential(
+    torch.nn.Linear(model.fc.in_features, 512),
+    torch.nn.ReLU(),
+    torch.nn.Dropout(0.5),
+    torch.nn.Linear(512, 1000)
+)
 model = model.to(device)
-criterion = torch.nn.BCEWithLogitsLoss()  
-optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
+criterion = torch.nn.BCEWithLogitsLoss()
+optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
 
 if load_model:
     model.load_state_dict(torch.load(pretrained_path, map_location=device))
@@ -138,6 +141,7 @@ def train_model(model, criterion, optimizer, train_loader, num_epochs):
     for epoch in range(num_epochs):
         model.train()
         running_loss = 0.0
+        total_samples = 0
         
         logging.info(f"Epoch {epoch + 1}/{num_epochs}")
 
@@ -150,10 +154,10 @@ def train_model(model, criterion, optimizer, train_loader, num_epochs):
             loss.backward()
             optimizer.step()
 
-            running_loss += loss.item()
+            running_loss += loss.item() * inputs.size(0)
+            total_samples += inputs.size(0)
 
-            
-        epoch_loss = running_loss / len(train_loader)
+        epoch_loss = running_loss / total_samples
         torch.save(model.state_dict(),model_save_path)
         logging.info(f'Epoch [{epoch + 1}/{num_epochs}], Average Loss: {epoch_loss:.4f}')
     
