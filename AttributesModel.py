@@ -70,7 +70,7 @@ def download_dataset(file_id, destination):
         logging.info("Download complete.")
 
 
-file_id = '1-1oFzKtk9Gh37GkQW4Qg0z2glAD0LJs_'
+file_id = '1oT-v72rrwfkcr3e920WF57dwPfnTwXWw'
 train_path = os.path.join(root_dir, 'train.csv')
 download_dataset(file_id, train_path)
 
@@ -105,15 +105,15 @@ def read_valid_entries_from_csv(csv_file):
     img_labels = []
     with open(csv_file, mode='r') as file:
         reader = csv.reader(file)
+        next(reader)
         for row in reader:
             try:
-                label=ast.literal_eval(row[1])
-                label=[int(value) for value in label]
+                label = list(map(int, eval(row[1])))
                 img_paths.append(os.path.join(root_dir, row[0]))
                 img_labels.append(label)
             except Exception as e:
-                print(f"Invalid entry in CSV: {row}")
-                print(e)
+                print(f"Invalid entry in CSV: {row[0]}")
+                print(e)               
     return img_paths, img_labels
 
 image_paths , image_labels = read_valid_entries_from_csv(train_path)
@@ -126,7 +126,7 @@ model = models.resnet50(pretrained=True)
 model.fc = nn.Linear(model.fc.in_features, 1000)  # 1000 output attributes
 
 model = model.to(device)
-criterion = nn.BCELoss() 
+criterion = torch.nn.BCEWithLogitsLoss()  
 optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
 
@@ -146,7 +146,7 @@ def train_model(model, criterion, optimizer, train_loader, num_epochs):
 
             optimizer.zero_grad()
             outputs = model(inputs)
-            loss = criterion(outputs, labels)
+            loss = criterion(outputs, labels.float())
             loss.backward()
             optimizer.step()
 
@@ -154,6 +154,7 @@ def train_model(model, criterion, optimizer, train_loader, num_epochs):
 
             
         epoch_loss = running_loss / len(train_loader)
+        torch.save(model.state_dict(),model_save_path)
         logging.info(f'Epoch [{epoch + 1}/{num_epochs}], Average Loss: {epoch_loss:.4f}')
     
     logging.info("Training complete.")
